@@ -1,73 +1,84 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Movieshop.API.ResponseModel;
+﻿using Microsoft.AspNetCore.Mvc;
+using ApplicationCore.Contracts.Repository;
+using Infrastructure.Repository;
+using ApplicationCore.Entities;
+using ApplicationCore.Contracts.Services;
 
-// For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
 namespace Movieshop.API.Controller
 {
-    [Route("movie")]
+    [Route("api/[controller]")]
     [ApiController]
     public class MovieController : ControllerBase
     {
-        //[Route("all-movies")]
-        //[HttpGet]
-        //public List <string> Get() {
-        //    return new List<string> { "Rush Hour", "Die Hard"};
-        //}
-
-        //[Route("getonemovie")]
-        //[HttpGet]
-        //public string GetMovie()
-        //{
-        //    return "Die Hard";
-        //}
-
-        //[Route("get/{id:min(1):max(200)}")] // using dynamics
-        //public string GetByID(int id) {
-        //    return "Movie = " + id;
-        //}
-
-        //[Route("getbyname/{name:alpha:length(10)}")] //alpha filter will only allow alphabets
-        //// any chars less than or more than 10 will not work
-        //public string GetByName(string name) {
-        //    return "Movie: " + name;
-        //}
-
-        List<MovieResponseModel> lst;
-        public MovieController()
+        private readonly IMovieService _movieService;
+        public MovieController(IMovieService movieService)
         {
-            lst = new List<MovieResponseModel>()
+            _movieService = movieService;
+
+        }
+
+
+        [HttpGet]
+        [Route("")]
+        // http://localhost:73434/api/movies?pagesize=30&page=2&title=ave
+        public async Task<IActionResult> GetMoviesByPaginationAsync([FromQuery] int pageSize = 30, [FromQuery] int page = 1, string title = "")
+        {
+            var movies = await _movieService.GetMoviesByPaginationAsync(pageSize, page, title);
+            if (movies == null || movies.Count == 0)
             {
-                new MovieResponseModel { Id = 1, Name="Die Hard", Ratings = 3},
-                new MovieResponseModel { Id = 2, Name="Fast and Furious", Ratings = 5},
-                new MovieResponseModel { Id = 3, Name="Rush Hour", Ratings = 7.5f},
-            };
+                return NotFound($"no movies found for your search term {title}");
+            }
+            return Ok(movies);
         }
-        [Route("list")]
-        public IActionResult Get()
+
+        [HttpGet]
+        [Route("toprevenue")]
+        public async Task<IActionResult> GetTopRevenueMoviesAsync()
         {
-            return Ok(lst);
-        }
+            var movies = await _movieService.GetTop30GrossingMoviesAsync();
 
-        [Route("id/{id:int}")]
-        public IActionResult Get(int id) {
-            if (id < 1) 
-                return BadRequest();
-            return Ok(lst.Where(x => x.Id == id).FirstOrDefault());
-        }
+            if (!movies.Any())
+            {
+                return NotFound();
+            }
 
-        [Route("name/{name:alpha}")]
-        public IActionResult GetByName(string name) {
-            if (string.IsNullOrEmpty(name))
-                return NoContent();
-            return Ok(lst.Where(x => x.Name == name).FirstOrDefault());
+            return Ok(movies);
         }
+        [HttpGet]
+        [Route("{id:int}")]
+        public async Task<IActionResult> DetailsAsync(int id)
+        {
+            var movie = await _movieService.GetMovieDetailsAsync(id);
 
+            if (movie == null)
+                return NotFound();
+            return Ok(movie);
+        }
+        [HttpGet]
+        [Route("toprated")]
+        public async Task<IActionResult> GetAllMoviesAsync()
+        {
+            var movies = await _movieService.GetTop30GRatedMoviesAsync();
+
+            if (!movies.Any() || movies.Count == 0)
+            {
+                return NotFound();
+            }
+            return Ok(movies);
+        }
+        [HttpGet]
+        [Route("genre/{id:int}")]
+        public async Task<IActionResult> GetMovieByGenreIdAsync(int id)
+        {
+            var genreMovies = await _movieService.MoviesSameGenreAsync(id);
+
+            if (!genreMovies.Any())
+            {
+                return NotFound();
+            }
+            return Ok(genreMovies);
+        }
     }
 }
 
